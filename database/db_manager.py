@@ -3,7 +3,11 @@ import sqlite3
 import random
 from datetime import datetime, timedelta
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'warehouse.db')
+if os.environ.get('VERCEL') or 'VERCEL' in os.environ:
+    DB_PATH = '/tmp/warehouse.db'
+else:
+    DB_PATH = os.path.join(os.path.dirname(__file__), 'warehouse.db')
+
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
