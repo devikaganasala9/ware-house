@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+
+{% block title %}Packing & Quality Check | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Packing & Quality Inspections</h1>
+        <p>Verify packing compliance, assign standard containers, and log quality pass/fail checks.</p>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <h2>Packing Operations Backlog</h2>
+    </div>
+    <div class="panel-body">
+        <div class="data-table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Priority</th>
+                        <th>Items Summary</th>
+                        <th>Assigned Worker</th>
+                        <th>Package Container</th>
+                        <th>QC Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if tasks %}
+                        {% for task in tasks %}
+                        <tr>
+                            <td><strong>O{{ task.order_id[1:] if task.order_id.startswith('O') else task.order_id }}</strong></td>
+                            <td>{{ task.customer }}</td>
+                            <td><span class="badge badge-priority-{{ task.priority_level|lower }}">{{ task.priority_level }}</span></td>
+                            <td><span style="font-family: monospace; font-size:0.8rem;">{{ task.items_summary }}</span></td>
+                            <td>{{ task.assigned_worker or 'Unassigned' }}</td>
+                            <td><span class="badge badge-priority-low"><i data-lucide="box" style="width:12px; height:12px; margin-right:2px; vertical-align:middle;"></i> {{ task.package_type }}</span></td>
+                            <td>
+                                <span class="badge {% if task.quality_check_status == 'Pass' %}badge-stock-healthy{% elif task.quality_check_status == 'Fail' %}badge-stock-out-of-stock{% else %}badge-status-pending-allocation{% endif %}">
+                                    {{ task.quality_check_status }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if task.quality_check_status == 'Pending' %}
+                                <button onclick="triggerQCModal('{{ task.order_id }}', '{{ task.items_summary }}')" class="btn btn-primary" style="padding:0.25rem 0.5rem; font-size:0.75rem;">
+                                    <i data-lucide="shield-check"></i> Quality Check
+                                </button>
+                                {% else %}
+                                <button class="btn btn-secondary" disabled style="padding:0.25rem 0.5rem; font-size:0.75rem; opacity:0.5;">
+                                    Completed
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem 0;">No items currently in packing queue.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Quality Check Checklist Overlay -->
+<div class="modal-overlay" id="qc-modal">
+    <div class="modal-content" style="max-width:550px;">
+        <div class="modal-header">
+            <span>Quality Control Checklist: Order <span id="qc-order-id"></span></span>
+            <button onclick="closeModal('qc-modal')" class="modal-close">&times;</button>
+        </div>
+        <form id="qc-checklist-form">
+            <input type="hidden" id="qc-pid" name="order_id">
+            <div class="modal-body" style="gap:1rem;">
+                <div style="background-color:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:6px; padding:0.75rem; font-size:0.85rem;">
+                    <span style="display:block; font-weight:700; color:var(--text-secondary); margin-bottom:0.25rem;">Items to Packing Station:</span>
+                    <span id="qc-items-list" style="font-family:monospace;"></span>
+                </div>
+                
+                <span style="font-size:0.8rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Mandatory Verifications</span>
+                
+                <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.85rem;">
+                    <label style="display:flex; gap:0.5rem; align-items:center; cursor:pointer;">
+                        <input type="checkbox" required style="width:16px; height:16px; accent-color:var(--accent-green);">
+                        <span>Correct items matching product list verified.</span>
+                    </label>
+                    <label style="display:flex; gap:0.5rem; align-items:center; cursor:pointer;">
+                        <input type="checkbox" required style="width:16px; height:16px; accent-color:var(--accent-green);">
+                        <span>Exact quantities matching demand allocated.</span>
+                    </label>
+                    <label style="display:flex; gap:0.5rem; align-items:center; cursor:pointer;">
+                        <input type="checkbox" required style="width:16px; height:16px; accent-color:var(--accent-green);">
+                        <span>Physical product integrity verified (no cracks/dents).</span>
+                    </label>
+                    <label style="display:flex; gap:0.5rem; align-items:center; cursor:pointer;">
+                        <input type="checkbox" required style="width:16px; height:16px; accent-color:var(--accent-green);">
+                        <span>Outer package shipping seals applied correctly.</span>
+                    </label>
+                    <label style="display:flex; gap:0.5rem; align-items:center; cursor:pointer;">
+                        <input type="checkbox" required style="width:16px; height:16px; accent-color:var(--accent-green);">
+                        <span>Carrier shipping label address matches system account.</span>
+                    </label>
+                </div>
+                
+                <div class="form-group" style="margin-top:0.5rem;">
+                    <label for="qc-notes">Inspection Notes (Required on failure)</label>
+                    <textarea id="qc-notes" name="notes" class="form-input" style="min-height:70px; resize:vertical;" placeholder="Write observations e.g. Box damaged, missing item, etc."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content:space-between;">
+                <button type="button" onclick="submitQCResult('Fail')" class="btn btn-danger">
+                    <i data-lucide="x-circle"></i> Fail QC
+                </button>
+                <div style="display:flex; gap:0.5rem;">
+                    <button type="button" onclick="closeModal('qc-modal')" class="btn btn-secondary">Cancel</button>
+                    <!-- Clicking Pass requires the checkboxes to be checked. Form submit does validation. -->
+                    <button type="submit" class="btn btn-primary" style="background-color:var(--accent-green); box-shadow:0 4px 12px rgba(16,185,129,0.25);">
+                        <i data-lucide="check-circle"></i> Pass QC
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function triggerQCModal(orderId, itemsSummary) {
+        document.getElementById('qc-order-id').innerText = orderId;
+        document.getElementById('qc-pid').value = orderId;
+        document.getElementById('qc-items-list').innerText = itemsSummary;
+        document.getElementById('qc-notes').value = '';
+        
+        // Reset checkboxes
+        const checkboxes = document.querySelectorAll('#qc-checklist-form input[type="checkbox"]');
+        checkboxes.forEach(c => c.checked = false);
+        
+        openModal('qc-modal');
+    }
+
+    // Pass Checklist Validation
+    document.getElementById('qc-checklist-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const orderId = document.getElementById('qc-pid').value;
+        const notes = document.getElementById('qc-notes').value || 'QC Passed and packaged.';
+        
+        try {
+            const res = await postData('/api/packing/qc', { order_id: orderId, status: 'Pass', notes: notes });
+            if (res.success) {
+                showToast(res.message, 'success');
+                closeModal('qc-modal');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (err) {
+            showToast('Failed to complete quality check validation.', 'error');
+        }
+    });
+
+    // Fail Checklist Result (doesn't require checkboxes to be checked, but requires notes)
+    async function submitQCResult(result) {
+        if (result === 'Fail') {
+            const orderId = document.getElementById('qc-pid').value;
+            const notes = document.getElementById('qc-notes').value.trim();
+            if (!notes) {
+                showToast('Failing QC requires descriptive inspection notes.', 'warning');
+                document.getElementById('qc-notes').focus();
+                return;
+            }
+            
+            try {
+                const res = await postData('/api/packing/qc', { order_id: orderId, status: 'Fail', notes: notes });
+                if (res.success) {
+                    showToast(res.message, 'warning');
+                    closeModal('qc-modal');
+                    setTimeout(() => window.location.reload(), 1200);
+                } else {
+                    showToast(res.message, 'error');
+                }
+            } catch (err) {
+                showToast('Failed to complete quality check validation.', 'error');
+            }
+        }
+    }
+</script>
+{% endblock %}

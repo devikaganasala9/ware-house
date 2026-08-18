@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Dispatch Staging | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Dispatch & Shipping Staging</h1>
+        <p>Manage order dispatch approvals, verify carrier assignments, and commit final inventory deductions.</p>
+    </div>
+</div>
+
+<div class="dashboard-layout" style="grid-template-columns: 2fr 1fr;">
+    <!-- Left Hand: Ready for Dispatch queue -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Staging Area: Ready for Carrier Handoff</h2>
+            <span class="badge badge-stock-healthy">{{ ready_orders|length }} Ready</span>
+        </div>
+        <div class="panel-body">
+            <div class="data-table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Fulfillment Deadline</th>
+                            <th>Priority</th>
+                            <th>Carrier Slot</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if ready_orders %}
+                            {% for order in ready_orders %}
+                            <tr id="dispatch-row-{{ order.id }}">
+                                <td><strong>O{{ order.id[1:] if order.id.startswith('O') else order.id }}</strong></td>
+                                <td>{{ order.customer }}</td>
+                                <td><span style="font-family:monospace; font-size:0.8rem;">{{ order.deadline.replace('T', ' ')[:16] }}</span></td>
+                                <td><span class="badge badge-priority-{{ order.priority_level|lower }}">{{ order.priority_level }}</span></td>
+                                <td><span class="badge badge-priority-low"><i data-lucide="truck" style="width:12px; height:12px; margin-right:2px; vertical-align:middle;"></i> DHL Express</span></td>
+                                <td>
+                                    <button onclick="shipOrder('{{ order.id }}')" class="btn btn-primary" style="padding:0.3rem 0.6rem; font-size:0.75rem;">
+                                        <i data-lucide="send"></i> Dispatch Ship
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align:center; color:var(--text-muted); padding:3rem 0;">
+                                    No orders currently waiting in staging. Complete packing and quality checklists first.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Hand: Recently Shipped Log -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Dispatched Registry (Recent)</h2>
+        </div>
+        <div class="panel-body" style="display:flex; flex-direction:column; gap:0.75rem;">
+            {% if dispatched_orders %}
+                {% for order in dispatched_orders %}
+                <div style="padding:0.75rem; background-color:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:6px; font-size:0.8rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong style="color:var(--accent-green);">{{ order.id }}</strong>
+                        <span class="badge badge-status-dispatched" style="font-size:0.65rem;">Dispatched</span>
+                    </div>
+                    <p style="color:var(--text-secondary); margin-top:0.25rem;">Client: {{ order.customer }}</p>
+                    <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-top:0.25rem;">Deadline: {{ order.deadline.replace('T', ' ')[:16] }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div style="text-align:center; color:var(--text-muted); padding:1rem 0; font-size:0.85rem;">No recently dispatched orders.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function shipOrder(orderId) {
+        try {
+            const res = await postData('/api/dispatch', { order_id: orderId });
+            if (res.success) {
+                showToast(res.message, 'success');
+                const row = document.getElementById(`dispatch-row-${orderId}`);
+                if (row) {
+                    row.style.opacity = '0.3';
+                    row.querySelector('button').disabled = true;
+                }
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (e) {
+            showToast('Failed to dispatch order.', 'error');
+        }
+    }
+</script>
+{% endblock %}

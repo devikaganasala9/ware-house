@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+
+{% block title %}Inventory | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Inventory Management</h1>
+        <p>Monitor physical stock, reorder levels, locations, and log damages.</p>
+    </div>
+</div>
+
+<!-- Filters Panel -->
+<form action="{{ url_for('inventory') }}" method="GET" class="filter-bar">
+    <div class="filter-group">
+        <label for="search-q">Search Items</label>
+        <input type="text" name="q" id="search-q" value="{{ q }}" placeholder="Name, SKU, ID..." class="filter-input">
+    </div>
+    
+    <div class="filter-group">
+        <label for="category-select">Category</label>
+        <select name="category" id="category-select" class="filter-input">
+            <option value="">All Categories</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}" {% if selected_cat == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <label for="status-select">Status</label>
+        <select name="status" id="status-select" class="filter-input">
+            <option value="">All Statuses</option>
+            <option value="Healthy" {% if selected_status == 'Healthy' %}selected{% endif %}>Healthy</option>
+            <option value="Low Stock" {% if selected_status == 'Low Stock' %}selected{% endif %}>Low Stock</option>
+            <option value="Out of Stock" {% if selected_status == 'Out of Stock' %}selected{% endif %}>Out of Stock</option>
+            <option value="Overstocked" {% if selected_status == 'Overstocked' %}selected{% endif %}>Overstocked</option>
+            <option value="Damaged" {% if selected_status == 'Damaged' %}selected{% endif %}>Damaged</option>
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <label for="sort-select">Sort By</label>
+        <select name="sort_by" id="sort-select" class="filter-input">
+            <option value="id" {% if sort_by == 'id' %}selected{% endif %}>Product ID</option>
+            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Product Name</option>
+            <option value="available_qty" {% if sort_by == 'available_qty' %}selected{% endif %}>Available Qty</option>
+            <option value="reorder_level" {% if sort_by == 'reorder_level' %}selected{% endif %}>Reorder Level</option>
+            <option value="status" {% if sort_by == 'status' %}selected{% endif %}>Status</option>
+        </select>
+    </div>
+    
+    <div class="filter-group" style="align-self: flex-end;">
+        <button type="submit" class="btn btn-primary"><i data-lucide="search"></i> Apply Filters</button>
+    </div>
+    
+    <div class="filter-group" style="align-self: flex-end;">
+        <a href="{{ url_for('inventory') }}" class="btn btn-secondary"><i data-lucide="x"></i> Clear</a>
+    </div>
+</form>
+
+<!-- Products Data Table Panel -->
+<div class="panel">
+    <div class="panel-body">
+        <div class="data-table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Product ID</th>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>SKU</th>
+                        <th>Location</th>
+                        <th>Available Qty</th>
+                        <th>Reserved Qty</th>
+                        <th>Damaged Qty</th>
+                        <th>Reorder Level</th>
+                        <th>Status</th>
+                        <th>AI Action Recommendation</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if products %}
+                        {% for p in products %}
+                        <tr>
+                            <td><strong>{{ p.id }}</strong></td>
+                            <td>{{ p.name }}</td>
+                            <td>{{ p.category }}</td>
+                            <td><span style="font-family: monospace;">{{ p.sku }}</span></td>
+                            <td><span class="badge badge-priority-low"><i data-lucide="map-pin" style="width:12px; height:12px; margin-right:2px;"></i> {{ p.location }}</span></td>
+                            <td><strong>{{ p.available_qty }}</strong></td>
+                            <td>{{ p.reserved_qty }}</td>
+                            <td>
+                                {% if p.damaged_qty > 0 %}
+                                    <span style="color: var(--accent-red);">
+                                        {{ p.damaged_qty }}
+                                    </span>
+                                {% else %}
+                                    <span style="color: var(--text-secondary);">
+                                        {{ p.damaged_qty }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>{{ p.reorder_level }}</td>
+                            <td>
+                                <span class="badge badge-stock-{{ p.status|lower|replace(' ', '-') }}">{{ p.status }}</span>
+                            </td>
+                            <td>
+                                {% if p.status == 'Low Stock' %}
+                                <div style="font-size:0.75rem; color: var(--accent-orange); font-weight:600;">
+                                    <i data-lucide="alert-triangle" style="width:12px; height:12px; display:inline-block; vertical-align:middle;"></i> 
+                                    Reorder {{ p.reorder_qty }} units.
+                                </div>
+                                {% elif p.status == 'Out of Stock' %}
+                                <div style="font-size:0.75rem; color: var(--accent-red); font-weight:700;">
+                                    <i data-lucide="shield-alert" style="width:12px; height:12px; display:inline-block; vertical-align:middle;"></i> 
+                                    Urgent: Reorder {{ p.reorder_qty }} units!
+                                </div>
+                                {% elif p.status == 'Overstocked' %}
+                                <div style="font-size:0.75rem; color: var(--accent-purple); font-weight:500;">
+                                    Reduce incoming shipments.
+                                </div>
+                                {% elif p.status == 'Damaged' %}
+                                <div style="font-size:0.75rem; color: var(--accent-red); font-weight:600;">
+                                    Accept write-off exception.
+                                </div>
+                                {% else %}
+                                <span style="color:var(--text-muted); font-size:0.75rem;">Safety stock healthy.</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div style="display:flex; gap:0.25rem;">
+                                    <button onclick="triggerAdjustModal('{{ p.id }}', '{{ p.name }}')" class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" title="Adjust Stock">
+                                        <i data-lucide="edit"></i>
+                                    </button>
+                                    <button onclick="triggerDamageModal('{{ p.id }}', '{{ p.name }}')" class="btn btn-danger" style="padding:0.25rem 0.5rem; font-size:0.75rem;" title="Log Damaged Stock">
+                                        <i data-lucide="heart-off"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No products match your filters.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal A: Adjust Stock Overlay -->
+<div class="modal-overlay" id="adjust-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span id="adjust-modal-title">Adjust Inventory</span>
+            <button onclick="closeModal('adjust-modal')" class="modal-close">&times;</button>
+        </div>
+        <form id="adjust-stock-form">
+            <div class="modal-body">
+                <input type="hidden" name="product_id" id="adjust-pid">
+                <div class="form-group">
+                    <label>Product Name</label>
+                    <input type="text" id="adjust-pname" readonly class="form-input" style="opacity:0.7;">
+                </div>
+                <div class="form-group">
+                    <label for="adjust-qty">Stock Change (Use negative values to deduct)</label>
+                    <input type="number" name="quantity" id="adjust-qty" required class="form-input" placeholder="e.g. +10 or -5">
+                </div>
+                <div class="form-group">
+                    <label for="adjust-reason">Reason for Adjustment</label>
+                    <input type="text" name="reason" id="adjust-reason" required class="form-input" placeholder="e.g. Cycle count discrepancy">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('adjust-modal')" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal B: Record Damage Overlay -->
+<div class="modal-overlay" id="damage-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span id="damage-modal-title">Record Damaged Product</span>
+            <button onclick="closeModal('damage-modal')" class="modal-close">&times;</button>
+        </div>
+        <form id="record-damage-form">
+            <div class="modal-body">
+                <input type="hidden" name="product_id" id="damage-pid">
+                <div class="form-group">
+                    <label>Product Name</label>
+                    <input type="text" id="damage-pname" readonly class="form-input" style="opacity:0.7;">
+                </div>
+                <div class="form-group">
+                    <label for="damage-qty">Damaged Quantity (To isolate from available stock)</label>
+                    <input type="number" name="quantity" id="damage-qty" min="1" required class="form-input" placeholder="e.g. 3">
+                </div>
+                <div class="form-group">
+                    <label for="damage-reason">Physical Condition Details</label>
+                    <input type="text" name="reason" id="damage-reason" required class="form-input" placeholder="e.g. Damaged water seals in shelf container">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('damage-modal')" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-danger">Record Damage</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Adjust Stock Modal Handlers
+    function triggerAdjustModal(pid, name) {
+        document.getElementById('adjust-pid').value = pid;
+        document.getElementById('adjust-pname').value = name;
+        document.getElementById('adjust-qty').value = '';
+        document.getElementById('adjust-reason').value = '';
+        openModal('adjust-modal');
+    }
+
+    document.getElementById('adjust-stock-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const data = {
+            product_id: fd.get('product_id'),
+            quantity: fd.get('quantity'),
+            reason: fd.get('reason')
+        };
+        try {
+            const res = await postData('/api/inventory/adjust', data);
+            if (res.success) {
+                showToast(res.message, 'success');
+                closeModal('adjust-modal');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (err) {
+            showToast('Error adjusting stock levels.', 'error');
+        }
+    });
+
+    // Damage Modal Handlers
+    function triggerDamageModal(pid, name) {
+        document.getElementById('damage-pid').value = pid;
+        document.getElementById('damage-pname').value = name;
+        document.getElementById('damage-qty').value = '';
+        document.getElementById('damage-reason').value = '';
+        openModal('damage-modal');
+    }
+
+    document.getElementById('record-damage-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const data = {
+            product_id: fd.get('product_id'),
+            quantity: fd.get('quantity'),
+            reason: fd.get('reason')
+        };
+        try {
+            const res = await postData('/api/inventory/damage', data);
+            if (res.success) {
+                showToast(res.message, 'success');
+                closeModal('damage-modal');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (err) {
+            showToast('Error recording damaged inventory.', 'error');
+        }
+    });
+</script>
+{% endblock %}

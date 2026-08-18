@@ -1,0 +1,333 @@
+{% extends 'base.html' %}
+
+{% block title %}Picking Operations | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Picking Department</h1>
+        <p>Optimize warehouse picker workflows, balance zones, and minimize transit distance.</p>
+    </div>
+</div>
+
+<!-- 1. Picking Routing Optimizer -->
+{% if opt_path %}
+<div class="panel" style="border-color: var(--accent-purple); background: linear-gradient(135deg, rgba(168, 85, 247, 0.03), rgba(0,0,0,0));">
+    <div class="panel-header" style="border-bottom-color: rgba(168, 85, 247, 0.1);">
+        <h2><i data-lucide="route" style="color:var(--accent-purple);"></i> AI Picking Path Optimization</h2>
+        <span class="badge badge-priority-medium">ACTIVE ALGORITHM</span>
+    </div>
+    <div class="panel-body">
+        <div class="picking-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:2rem; align-items: stretch;">
+            <!-- Left: Paths Compared & Stats -->
+            <div style="display:flex; flex-direction:column; gap:1.25rem; justify-content: space-between;">
+                <div>
+                    <span style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Standard Batch Path (Database Insertion Order)</span>
+                    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; font-family:monospace; margin-top:0.4rem; padding:0.75rem; border:1px solid rgba(239,68,68,0.15); background:rgba(239,68,68,0.02); border-radius:6px;">
+                        {% for node in opt_path.current_path.split(' → ') %}
+                            <span style="padding:0.25rem 0.5rem; background:rgba(239, 68, 68, 0.08); border:1px solid rgba(239, 68, 68, 0.15); border-radius:4px; font-weight:600; font-size:0.8rem; color:var(--accent-red);">{{ node }}</span>
+                            {% if not loop.last %}
+                                <i data-lucide="chevrons-right" style="width:12px; height:12px; opacity:0.5; color:var(--accent-red);"></i>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                <div>
+                    <span style="font-size:0.75rem; font-weight:700; color:var(--accent-green); text-transform:uppercase;">Optimized Sequence Path (Zone Clustering Route)</span>
+                    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; font-family:monospace; margin-top:0.4rem; padding:0.75rem; border:1px solid rgba(16,185,129,0.25); background:rgba(16,185,129,0.03); border-radius:6px; box-shadow:0 0 15px rgba(16,185,129,0.05);">
+                        {% for node in opt_path.optimized_path.split(' → ') %}
+                            <span style="padding:0.25rem 0.5rem; background:rgba(16, 185, 129, 0.12); border:1px solid rgba(16, 185, 129, 0.25); border-radius:4px; font-weight:700; font-size:0.8rem; color:var(--accent-green);">{{ node }}</span>
+                            {% if not loop.last %}
+                                <i data-lucide="chevrons-right" style="width:12px; height:12px; color:var(--accent-green);"></i>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- Statistics Cards -->
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.75rem; margin-top:0.5rem;">
+                    <div style="background-color:rgba(0,0,0,0.1); border:1px solid var(--border-color); border-radius:6px; padding:0.75rem; text-align:center;">
+                        <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; display:block;">Items Picked</span>
+                        <strong style="font-size:1.2rem; display:block; margin-top:0.25rem; color:var(--text-primary);">{{ opt_path.item_count }}</strong>
+                    </div>
+                    <div style="background-color:rgba(16,185,129,0.02); border:1px solid rgba(16,185,129,0.15); border-radius:6px; padding:0.75rem; text-align:center;">
+                        <span style="font-size:0.7rem; color:var(--accent-green); text-transform:uppercase; display:block;">Distance Saved</span>
+                        <strong style="color:var(--accent-green); font-size:1.2rem; display:block; margin-top:0.25rem;">{{ opt_path.distance_reduced }}</strong>
+                    </div>
+                    <div style="background-color:rgba(168,85,247,0.02); border:1px solid rgba(168,85,247,0.15); border-radius:6px; padding:0.75rem; text-align:center;">
+                        <span style="font-size:0.7rem; color:var(--accent-purple); text-transform:uppercase; display:block;">Time Saved</span>
+                        <strong style="color:var(--accent-purple); font-size:1.2rem; display:block; margin-top:0.25rem;">{{ opt_path.time_saved }}</strong>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right: Animated SVG Warehouse Map -->
+            <div style="background:var(--bg-sidebar); border:1px solid var(--border-color); border-radius:8px; display:flex; flex-direction:column; padding:1rem; position:relative; min-height:280px;">
+                <span style="font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;">
+                    <span><i data-lucide="map" style="width:12px; height:12px; vertical-align:middle; margin-right:4px;"></i> Live Warehouse Path Plotter</span>
+                    <span style="font-size:0.6rem; color:var(--accent-green); display:flex; align-items:center; gap:4px;">
+                        <span style="width:6px; height:6px; background:var(--accent-green); border-radius:50%; display:inline-block; animation: blink 1.5s infinite;"></span>
+                        Live Path Grid
+                    </span>
+                </span>
+                <div style="width:100%; flex:1; position:relative; display:flex; align-items:center; justify-content:center;" id="map-canvas-container">
+                    <!-- SVG Map will be dynamically loaded via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes drawPath {
+        to {
+            stroke-dashoffset: 0;
+        }
+    }
+    @keyframes blink {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; }
+    }
+</style>
+{% endif %}
+
+<div class="dashboard-layout">
+    <!-- Left Hand: Active Picking Tasks -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Active picking queue</h2>
+        </div>
+        <div class="panel-body">
+            <div class="data-table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Task ID</th>
+                            <th>Picker Assigned</th>
+                            <th>Order ID</th>
+                            <th>Zone</th>
+                            <th>Items Details</th>
+                            <th>Total Units</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        <tr>
+                            <td><strong>#PT{{ task.id }}</strong></td>
+                            <td>
+                                {% if task.picker_id %}
+                                <span style="font-weight:600;">{{ task.picker_name }}</span>
+                                <span style="font-size:0.7rem; color:var(--text-muted); display:block;">ID: {{ task.picker_id }}</span>
+                                {% else %}
+                                <span style="color:var(--text-muted); font-style:italic;">Unassigned (Auto Queue)</span>
+                                {% endif %}
+                            </td>
+                            <td>O{{ task.order_id[1:] if task.order_id.startswith('O') else task.order_id }}</td>
+                            <td><span class="badge badge-priority-low">{{ task.zone }}</span></td>
+                            <td><span style="font-family:monospace; font-size:0.8rem;">{{ task.items_summary }}</span></td>
+                            <td>{{ task.quantity }}</td>
+                            <td>
+                                <span class="badge badge-worker-{{ task.status|lower }}">{{ task.status }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Hand: Pickers Status & Zone Congestions -->
+    <div style="display:flex; flex-direction:column; gap:1.5rem;">
+        <!-- Pickers List -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Warehouse Pickers Registry</h2>
+            </div>
+            <div class="panel-body">
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Assigned Zone</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in pickers %}
+                            <tr>
+                                <td>
+                                    <strong>{{ p.name }}</strong>
+                                    <span style="font-size:0.7rem; color:var(--text-muted); display:block;">{{ p.id }}</span>
+                                </td>
+                                <td>{{ p.zone }}</td>
+                                <td><span class="badge badge-worker-{{ p.status|lower }}">{{ p.status }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bottlenecks panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Zone Congestion Warnings</h2>
+            </div>
+            <div class="panel-body">
+                <div class="bottleneck-list">
+                    {% if bottlenecks %}
+                        {% for b in bottlenecks %}
+                        {% if b.category == 'Picking Zone' %}
+                        <div class="bottleneck-card {{ b.severity|lower }}" style="margin:0;">
+                            <div class="bottleneck-header {{ b.severity|lower }}">
+                                <span class="title">{{ b.target }} Workload</span>
+                                <span class="severity">{{ b.severity }}</span>
+                            </div>
+                            <p style="font-size:0.8rem; margin:0.25rem 0; color:var(--text-secondary);">{{ b.description }}</p>
+                            <div class="bottleneck-rec" style="font-size:0.75rem;">
+                                {{ b.recommendation }}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align:center; color:var(--text-muted); padding:1rem 0; font-size:0.85rem;">
+                            No zone bottlenecks detected. Workload is balanced.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    {% if opt_path %}
+    const currentPathStr = "{{ opt_path.current_path }}";
+    const optimizedPathStr = "{{ opt_path.optimized_path }}";
+    
+    const currentNodes = currentPathStr.split(" → ");
+    const optimizedNodes = optimizedPathStr.split(" → ");
+    
+    function getCoords(node) {
+        const parts = node.split("-");
+        if (parts.length < 2) return { x: 50, y: 50 };
+        const zone = parts[0].toUpperCase();
+        const pos = parseInt(parts[1], 10);
+        
+        let x = 60;
+        if (zone === 'A') x = 60;
+        else if (zone === 'B') x = 150;
+        else if (zone === 'C') x = 240;
+        else if (zone === 'D') x = 330;
+        else if (zone === 'E') x = 420;
+        
+        const y = 40 + (pos * 17);
+        return { x, y };
+    }
+    
+    const container = document.getElementById('map-canvas-container');
+    if (container) {
+        let svgHtml = `
+        <svg viewBox="0 0 480 260" style="width:100%; height:100%; overflow:visible;">
+            <defs>
+                <style>
+                    .opt-line {
+                        stroke-dasharray: 1000;
+                        stroke-dashoffset: 1000;
+                        animation: drawPath 5s ease-in-out infinite;
+                    }
+                    .pulse-ring {
+                        transform-origin: center;
+                        animation: pulse 2.5s infinite;
+                    }
+                    @keyframes pulse {
+                        0% { r: 6; opacity: 0.8; }
+                        100% { r: 14; opacity: 0; }
+                    }
+                </style>
+            </defs>
+            
+            <!-- Aisles Background Grid -->
+            <g opacity="0.12">
+        `;
+        
+        const xPositions = [60, 150, 240, 330, 420];
+        for (let x of xPositions) {
+            // Racks
+            for (let pos = 1; pos <= 12; pos++) {
+                const y = 40 + (pos * 17);
+                svgHtml += `<rect x="${x - 22}" y="${y - 5}" width="14" height="10" rx="1.5" fill="var(--text-primary)" />`;
+                svgHtml += `<rect x="${x + 8}" y="${y - 5}" width="14" height="10" rx="1.5" fill="var(--text-primary)" />`;
+            }
+        }
+        
+        svgHtml += `
+            </g>
+            <!-- Aisle Headings -->
+            <g font-size="8" fill="var(--text-muted)" font-weight="700" text-anchor="middle" opacity="0.6">
+                <text x="60" y="28">ZONE A</text>
+                <text x="150" y="28">ZONE B</text>
+                <text x="240" y="28">ZONE C</text>
+                <text x="330" y="28">ZONE D</text>
+                <text x="420" y="28">ZONE E</text>
+            </g>
+        `;
+        
+        // Standard path points
+        let standardPoints = currentNodes.map(getCoords);
+        let standardPathD = "";
+        if (standardPoints.length > 0) {
+            standardPathD = `M ${standardPoints[0].x} ${standardPoints[0].y} ` + standardPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+        }
+        
+        // Optimized path points
+        let optimizedPoints = optimizedNodes.map(getCoords);
+        let optimizedPathD = "";
+        if (optimizedPoints.length > 0) {
+            optimizedPathD = `M ${optimizedPoints[0].x} ${optimizedPoints[0].y} ` + optimizedPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+        }
+        
+        // Draw lines
+        if (standardPathD) {
+            svgHtml += `<path d="${standardPathD}" fill="none" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.4" />`;
+        }
+        if (optimizedPathD) {
+            svgHtml += `<path d="${optimizedPathD}" fill="none" stroke="var(--accent-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="opt-line" />`;
+        }
+        
+        // Render node targets (Standard)
+        standardPoints.forEach(p => {
+            svgHtml += `<circle cx="${p.x}" cy="${p.y}" r="2" fill="var(--accent-red)" opacity="0.4" />`;
+        });
+        
+        // Render node targets (Optimized)
+        optimizedPoints.forEach((p, idx) => {
+            const isStart = idx === 0;
+            const isEnd = idx === optimizedPoints.length - 1;
+            
+            let color = "var(--accent-green)";
+            if (isStart) color = "var(--accent-blue)";
+            else if (isEnd) color = "var(--accent-purple)";
+            
+            svgHtml += `
+            <circle cx="${p.x}" cy="${p.y}" r="6" class="pulse-ring" fill="none" stroke="${color}" stroke-width="1" />
+            <circle cx="${p.x}" cy="${p.y}" r="5.5" fill="var(--bg-sidebar)" stroke="${color}" stroke-width="1.5" />
+            <text x="${p.x}" y="${p.y + 2.5}" font-size="7" fill="var(--text-primary)" font-weight="800" text-anchor="middle">${idx + 1}</text>
+            `;
+        });
+        
+        svgHtml += `</svg>`;
+        container.innerHTML = svgHtml;
+    }
+    {% endif %}
+});
+</script>
+{% endblock %}

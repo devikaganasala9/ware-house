@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Smart Warehouse AI{% endblock %}</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="sidebar-logo-icon">S</div>
+                <h2>SMART WAREHOUSE AI</h2>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <!-- Dashboard visible to all -->
+                <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.path == '/' %}active{% endif %}">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+                
+                <!-- Operator and Manager sections -->
+                {% if current_role in ['Warehouse Manager', 'Warehouse Operator'] %}
+                <a href="{{ url_for('inventory') }}" class="nav-item {% if request.path == '/inventory' %}active{% endif %}">
+                    <i data-lucide="package"></i>
+                    <span>Inventory</span>
+                </a>
+                
+                <a href="{{ url_for('orders') }}" class="nav-item {% if request.path.startswith('/orders') %}active{% endif %}">
+                    <i data-lucide="shopping-cart"></i>
+                    <span>Orders</span>
+                </a>
+                {% endif %}
+                
+                <!-- Picker specific -->
+                {% if current_role in ['Warehouse Manager', 'Picker'] %}
+                <a href="{{ url_for('picking') }}" class="nav-item {% if request.path == '/picking' %}active{% endif %}">
+                    <i data-lucide="navigation"></i>
+                    <span>Picking</span>
+                </a>
+                {% endif %}
+                
+                <!-- Packing specific -->
+                {% if current_role in ['Warehouse Manager', 'Packing Staff'] %}
+                <a href="{{ url_for('packing') }}" class="nav-item {% if request.path == '/packing' %}active{% endif %}">
+                    <i data-lucide="archive"></i>
+                    <span>Packing & QC</span>
+                </a>
+                {% endif %}
+                
+                <!-- Operator and Manager sections -->
+                {% if current_role in ['Warehouse Manager', 'Warehouse Operator'] %}
+                <a href="{{ url_for('exceptions') }}" class="nav-item {% if request.path == '/exceptions' %}active{% endif %}">
+                    <i data-lucide="alert-triangle"></i>
+                    <span>Exceptions</span>
+                    {% if alert_counts.critical > 0 %}
+                    <span class="nav-badge critical">{{ alert_counts.critical }}</span>
+                    {% endif %}
+                </a>
+                
+                <a href="{{ url_for('dispatch') }}" class="nav-item {% if request.path == '/dispatch' %}active{% endif %}">
+                    <i data-lucide="truck"></i>
+                    <span>Dispatch</span>
+                </a>
+                
+                <a href="{{ url_for('recommendations') }}" class="nav-item {% if request.path == '/recommendations' %}active{% endif %}">
+                    <i data-lucide="cpu"></i>
+                    <span>Recommendations</span>
+                    {% if rec_count > 0 %}
+                    <span class="nav-badge">{{ rec_count }}</span>
+                    {% endif %}
+                </a>
+                {% endif %}
+                
+                <!-- Manager specific -->
+                {% if current_role == 'Warehouse Manager' %}
+                <a href="{{ url_for('simulator') }}" class="nav-item {% if request.path == '/simulator' %}active{% endif %}">
+                    <i data-lucide="sparkles"></i>
+                    <span>What-If Simulator</span>
+                </a>
+                
+                <a href="{{ url_for('analytics') }}" class="nav-item {% if request.path == '/analytics' %}active{% endif %}">
+                    <i data-lucide="bar-chart-2"></i>
+                    <span>Analytics</span>
+                </a>
+                {% endif %}
+                
+                <!-- Audit Logs visible to Operator and Manager -->
+                {% if current_role in ['Warehouse Manager', 'Warehouse Operator'] %}
+                <a href="{{ url_for('audit_logs') }}" class="nav-item {% if request.path == '/audit-logs' %}active{% endif %}">
+                    <i data-lucide="clipboard-list"></i>
+                    <span>Audit Log</span>
+                </a>
+                {% endif %}
+            </nav>
+        </aside>
+        
+        <!-- Main Layout Section -->
+        <main class="main-content">
+            <!-- Header Nav Bar -->
+            <header class="top-nav">
+                <div class="top-nav-left">
+                    <!-- Dropdown switcher for testing Roles easily -->
+                    <form action="{{ url_for('set_role') }}" method="POST" class="role-selector-form">
+                        <label for="role-select" style="font-size: 0.8rem; color: var(--text-secondary); font-weight:600;">ACTIVE ROLE:</label>
+                        <select name="role" id="role-select" class="role-select" onchange="this.form.submit()">
+                            <option value="Warehouse Manager" {% if current_role == 'Warehouse Manager' %}selected{% endif %}>Warehouse Manager</option>
+                            <option value="Warehouse Operator" {% if current_role == 'Warehouse Operator' %}selected{% endif %}>Warehouse Operator</option>
+                            <option value="Picker" {% if current_role == 'Picker' %}selected{% endif %}>Picker</option>
+                            <option value="Packing Staff" {% if current_role == 'Packing Staff' %}selected{% endif %}>Packing Staff</option>
+                        </select>
+                    </form>
+                </div>
+                
+                <div class="top-nav-right">
+                    <!-- Theme Toggle -->
+                    <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme">
+                        <i data-lucide="sun"></i>
+                    </button>
+                    
+                    <!-- Alert Dashboard link -->
+                    {% if current_role in ['Warehouse Manager', 'Warehouse Operator'] %}
+                    <div class="alert-indicator-wrapper" onclick="window.location.href='/exceptions'" title="View Active Exceptions">
+                        <i data-lucide="bell" style="color: var(--text-secondary);"></i>
+                        {% if alert_counts.total > 0 %}
+                        <span class="alert-indicator-badge">{{ alert_counts.total }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    <!-- User Profile Card -->
+                    <div class="user-profile">
+                        <div class="user-avatar">
+                            {% if current_role == 'Warehouse Manager' %}WM
+                            {% elif current_role == 'Warehouse Operator' %}WO
+                            {% elif current_role == 'Picker' %}PK
+                            {% else %}PS{% endif %}
+                        </div>
+                        <span style="font-size: 0.85rem; font-weight: 600;">{{ current_role }}</span>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Page Contents -->
+            <div class="content-body">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    
+    <!-- Toasts notifications -->
+    <div id="toast-container" class="toast-container"></div>
+    
+    <!-- Global JS script -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

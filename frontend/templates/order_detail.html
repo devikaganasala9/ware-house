@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+
+{% block title %}Order Details {{ order.id }} | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Order Fulfillment File: {{ order.id }}</h1>
+        <p>Customer: {{ order.customer }} | Placed: {{ order.order_date.replace('T', ' ')[:16] }}</p>
+    </div>
+    <div class="page-actions">
+        <a href="{{ url_for('orders') }}" class="btn btn-secondary"><i data-lucide="arrow-left"></i> Back to Orders</a>
+    </div>
+</div>
+
+<!-- 1. Interactive Operations Stepper -->
+<div class="panel">
+    <div class="panel-header">
+        <h2>Fulfillment Lifecycle Progress</h2>
+        <span class="badge badge-status-{{ order.status|lower.replace(' ', '-') }}">{{ order.status }}</span>
+    </div>
+    <div class="panel-body">
+        <div class="stepper-container">
+            <div class="stepper">
+                <!-- Helper logic to render step states dynamically -->
+                {% set status = order.status %}
+                
+                <!-- Step 1: Created -->
+                <div class="stepper-step {% if status != 'Created' %}completed{% else %}active{% endif %}">
+                    <div class="stepper-circle">1</div>
+                    <div class="stepper-label">Created</div>
+                </div>
+                
+                <!-- Step 2: Prioritized -->
+                <div class="stepper-step {% if status not in ['Created', 'Pending Allocation'] %}completed{% elif status == 'Pending Allocation' %}active{% endif %}">
+                    <div class="stepper-circle">2</div>
+                    <div class="stepper-label">Prioritized</div>
+                </div>
+                
+                <!-- Step 3: Inventory Checked -->
+                <div class="stepper-step {% if status not in ['Created', 'Pending Allocation', 'Partially Allocated'] %}completed{% elif status == 'Partially Allocated' %}active{% endif %}">
+                    <div class="stepper-circle">3</div>
+                    <div class="stepper-label">Checked</div>
+                </div>
+                
+                <!-- Step 4: Allocated -->
+                <div class="stepper-step {% if status not in ['Created', 'Pending Allocation', 'Partially Allocated', 'Allocated'] %}completed{% elif status == 'Allocated' %}active{% endif %}">
+                    <div class="stepper-circle">4</div>
+                    <div class="stepper-label">Allocated</div>
+                </div>
+                
+                <!-- Step 5: Picking -->
+                <div class="stepper-step {% if status not in ['Created', 'Pending Allocation', 'Partially Allocated', 'Allocated', 'Picking'] %}completed{% elif status == 'Picking' %}active{% endif %}">
+                    <div class="stepper-circle">5</div>
+                    <div class="stepper-label">Picking</div>
+                </div>
+                
+                <!-- Step 6: Packing -->
+                <div class="stepper-step {% if status not in ['Created', 'Pending Allocation', 'Partially Allocated', 'Allocated', 'Picking', 'Packed'] %}completed{% elif status == 'Packed' %}active{% endif %}">
+                    <div class="stepper-circle">6</div>
+                    <div class="stepper-label">Packing</div>
+                </div>
+                
+                <!-- Step 7: Quality Check -->
+                <div class="stepper-step {% if status not in ['Created', 'Pending Allocation', 'Partially Allocated', 'Allocated', 'Picking', 'Packed', 'Quality Check'] %}completed{% elif status == 'Quality Check' %}active{% endif %}">
+                    <div class="stepper-circle">7</div>
+                    <div class="stepper-label">Quality Check</div>
+                </div>
+                
+                <!-- Step 8: Ready for Dispatch -->
+                <div class="stepper-step {% if status == 'Dispatched' %}completed{% elif status == 'Ready for Dispatch' %}active{% endif %}">
+                    <div class="stepper-circle">8</div>
+                    <div class="stepper-label">Dispatch</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Priority Scorecard & Operational Status Details -->
+<div class="scorecard-grid">
+    <!-- Priority Scorecard -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Smart Priority Scorecard</h2>
+            <span class="badge badge-priority-{{ order.priority_level|lower }}">{{ order.priority_level }} Level</span>
+        </div>
+        <div class="modal-body" style="gap:1rem;">
+            <div style="display:flex; align-items:center; gap:1.5rem;">
+                <div style="width:75px; height:75px; border-radius:50%; background:var(--bg-sidebar); border:4px solid var({% if order.priority_score >= 70 %}--accent-red{% elif order.priority_score >= 50 %}--accent-orange{% elif order.priority_score >= 30 %}--accent-purple{% else %}--accent-blue{% endif %}); display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:800;">
+                    {{ order.priority_score }}
+                </div>
+                <div>
+                    <h4 style="font-weight:700;">Score Breakdown</h4>
+                    <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.15rem;">Dynamically recalculated by decision engine rules.</p>
+                </div>
+            </div>
+            
+            <div class="scorecard-list" style="margin-top:0.75rem;">
+                {% for r in reasons %}
+                <div class="scorecard-item">
+                    <span>{{ r }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Fulfillment Details -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Fulfillment Routing & Details</h2>
+        </div>
+        <div class="modal-body" style="gap:0.75rem; font-size:0.85rem;">
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                <span style="color:var(--text-secondary);">Customer Account</span>
+                <strong>{{ order.customer }}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                <span style="color:var(--text-secondary);">Fulfillment Deadline</span>
+                <strong style="font-family:monospace;">{{ order.deadline.replace('T', ' ')[:16] }}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                <span style="color:var(--text-secondary);">Delay Risk Level</span>
+                <strong style="color:{% if order.risk_level in ['Critical','High'] %}var(--accent-red){% else %}var(--text-primary){% endif %};">{{ order.risk_level }}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                <span style="color:var(--text-secondary);">Payment Status</span>
+                <strong>{{ order.payment_status }}</strong>
+            </div>
+            {% if picking %}
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                <span style="color:var(--text-secondary);">Picker Assigned</span>
+                <strong>{{ picking.picker_name or 'Waiting in queue' }} ({{ picking.status }})</strong>
+            </div>
+            {% endif %}
+            {% if packing %}
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                <span style="color:var(--text-secondary);">Packing Staff</span>
+                <strong>{{ packing.assigned_worker or 'Waiting in queue' }} (QC: {{ packing.quality_check_status }})</strong>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 3. Smart Recommendations for stock Reallocation -->
+{% if recommendations %}
+<div class="panel" style="border-color: var(--accent-red); background-color:rgba(239, 68, 68, 0.02);">
+    <div class="panel-header" style="border-bottom-color: rgba(239, 68, 68, 0.1);">
+        <h2 style="color:var(--accent-red);"><i data-lucide="cpu"></i> Smart Inventory Reallocation Action Required</h2>
+    </div>
+    <div class="panel-body" style="display:flex; flex-direction:column; gap:1rem;">
+        {% for rec in recommendations %}
+        <div class="rec-card Critical" style="margin:0;">
+            <div class="rec-header-row">
+                <span class="rec-title">{{ rec.title }}</span>
+                <span class="badge badge-priority-critical">Critical Action</span>
+            </div>
+            <div class="rec-body-block">
+                <p><strong>Recommendation:</strong> {{ rec.description }}</p>
+                <div class="rec-reason"><strong>Reasoning:</strong> {{ rec.reason }}</div>
+                <div class="rec-impact"><strong>Expected Impact:</strong> {{ rec.impact }}</div>
+            </div>
+            <div class="rec-actions">
+                <button onclick="acceptRecommendation('{{ rec.id }}')" class="btn btn-primary">Accept Reallocation</button>
+                <button onclick="rejectRecommendation('{{ rec.id }}')" class="btn btn-secondary">Reject</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- 4. Active Exceptions Timeline -->
+{% if exceptions %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Exception Lifecycle History</h2>
+    </div>
+    <div class="panel-body" style="display:flex; flex-direction:column; gap:1.25rem;">
+        {% for ex in exceptions %}
+        <div style="background-color:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:8px; padding:1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h4 style="font-weight:700; color:var(--accent-red);">{{ ex.id }}: {{ ex.type }}</h4>
+                <span class="badge badge-status-pending-allocation">{{ ex.status }}</span>
+            </div>
+            
+            <p style="font-size:0.85rem; margin:0.5rem 0; color:var(--text-secondary);">{{ ex.description }}</p>
+            
+            <!-- Exception -> Decision -> Resolution Timeline -->
+            <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:0.75rem;">Fulfillment Exception Timeline</span>
+                
+                <div style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.85rem;">
+                    <div style="display:flex; gap:0.5rem;">
+                        <span style="color:var(--accent-red); font-weight:600;">[EXCEPTION]</span>
+                        <span>Logged at {{ ex.detected_time.replace('T', ' ')[:16] }}</span>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                        <span style="color:var(--accent-blue); font-weight:600;">[DECISION]</span>
+                        <span>{{ ex.recommendation }}</span>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                        <span style="color:var(--accent-green); font-weight:600;">[RESOLUTION]</span>
+                        <span>
+                            {% if ex.status == 'Resolved' %}
+                            {{ ex.resolution_notes }}
+                            {% else %}
+                            Awaiting manager decision or recommendation action.
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- 5. Order Required Items Table -->
+<div class="panel">
+    <div class="panel-header">
+        <h2>Required Products & Allocations</h2>
+    </div>
+    <div class="panel-body">
+        <div class="data-table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Product ID</th>
+                        <th>Product Name</th>
+                        <th>SKU</th>
+                        <th>Location</th>
+                        <th>Inventory Avail</th>
+                        <th>Qty Ordered</th>
+                        <th>Qty Allocated</th>
+                        <th>Allocation Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td><strong>{{ item.product_id }}</strong></td>
+                        <td>{{ item.name }}</td>
+                        <td><span style="font-family: monospace;">{{ item.sku }}</span></td>
+                        <td><span class="badge badge-priority-low">{{ item.location }}</span></td>
+                        <td>{{ item.available_qty }}</td>
+                        <td><strong>{{ item.quantity }}</strong></td>
+                        <td><strong>{{ item.allocated_qty }}</strong></td>
+                        <td>
+                            {% if item.allocated_qty == 0 %}
+                            <span class="badge badge-stock-out-of-stock">Zero Allocation</span>
+                            {% elif item.allocated_qty < item.quantity %}
+                            <span class="badge badge-stock-low-stock">Partially Allocated</span>
+                            {% else %}
+                            <span class="badge badge-stock-healthy">Fully Allocated</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function acceptRecommendation(recId) {
+        try {
+            const res = await postData('/api/recommendations/accept', { recommendation_id: recId });
+            if (res.success) {
+                showToast(res.message, 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (e) {
+            showToast('Failed to accept recommendation.', 'error');
+        }
+    }
+
+    async function rejectRecommendation(recId) {
+        try {
+            const res = await postData('/api/recommendations/reject', { recommendation_id: recId });
+            if (res.success) {
+                showToast(res.message, 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (e) {
+            showToast('Failed to reject recommendation.', 'error');
+        }
+    }
+</script>
+{% endblock %}

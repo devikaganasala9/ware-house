@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Recommendations Inbox | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Smart Recommendation Engine</h1>
+        <p>Real-time machine-support recommendations. Action or dismiss generated system decisions.</p>
+    </div>
+</div>
+
+<div class="dashboard-layout" style="grid-template-columns: 2fr 1fr;">
+    <!-- Left Hand: Pending recommendations inbox -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Active Recommendations Queue</h2>
+            <span class="badge badge-priority-high" style="background-color: var(--accent-blue-glow); color:var(--accent-blue);">
+                {{ pending|length }} Pending
+            </span>
+        </div>
+        <div class="panel-body" style="display:flex; flex-direction:column; gap:1.25rem;">
+            {% if pending %}
+                {% for rec in pending %}
+                <div class="rec-card {{ rec.priority }}" id="rec-card-{{ rec.id }}">
+                    <div class="rec-header-row">
+                        <div>
+                            <span class="rec-title">{{ rec.title }}</span>
+                            <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-top:0.15rem;">
+                                Type: {{ rec.type }} | Reference ID: {{ rec.ref_id }}
+                            </span>
+                        </div>
+                        <span class="badge badge-priority-{{ rec.priority|lower }}">{{ rec.priority }}</span>
+                    </div>
+                    
+                    <div class="rec-body-block">
+                        <p style="font-size:0.9rem; color:var(--text-primary);">{{ rec.description }}</p>
+                        <div class="rec-reason">
+                            <strong>Reasoning Analysis:</strong><br>
+                            {{ rec.reason }}
+                        </div>
+                        <div class="rec-impact">
+                            <strong>Expected Operational Impact:</strong><br>
+                            {{ rec.impact }}
+                        </div>
+                    </div>
+                    
+                    <div class="rec-actions">
+                        <button onclick="rejectRec('{{ rec.id }}')" class="btn btn-secondary"><i data-lucide="x"></i> Reject</button>
+                        <button onclick="acceptRec('{{ rec.id }}')" class="btn btn-primary"><i data-lucide="check"></i> Accept & Execute</button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div style="text-align:center; color:var(--text-muted); padding:3rem 0;">
+                    <i data-lucide="cpu" style="width:40px; height:40px; stroke-width:1; margin-bottom:0.5rem;"></i>
+                    <p>Recommendations Inbox is empty. The engine is monitoring all data feeds.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Right Hand: History -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Resolution History</h2>
+        </div>
+        <div class="panel-body" style="display:flex; flex-direction:column; gap:0.75rem;">
+            {% if history %}
+                {% for rec in history %}
+                <div style="padding:0.75rem; background-color:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:6px; font-size:0.8rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:700;">{{ rec.title }}</span>
+                        <span class="badge {% if rec.status == 'Accepted' %}badge-stock-healthy{% else %}badge-stock-out-of-stock{% endif %}" style="font-size:0.65rem;">
+                            {{ rec.status }}
+                        </span>
+                    </div>
+                    <p style="color:var(--text-secondary); margin-top:0.35rem; font-size:0.75rem;">{{ rec.description }}</p>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div style="text-align:center; color:var(--text-muted); padding:1rem 0; font-size:0.85rem;">No historical records.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function acceptRec(recId) {
+        try {
+            const res = await postData('/api/recommendations/accept', { recommendation_id: recId });
+            if (res.success) {
+                showToast(res.message, 'success');
+                // Remove card or reload
+                const card = document.getElementById(`rec-card-${recId}`);
+                if (card) {
+                    card.style.opacity = '0.3';
+                    card.querySelector('.rec-actions').style.display = 'none';
+                }
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (e) {
+            showToast('Failed to execute recommendation.', 'error');
+        }
+    }
+
+    async function rejectRec(recId) {
+        try {
+            const res = await postData('/api/recommendations/reject', { recommendation_id: recId });
+            if (res.success) {
+                showToast(res.message, 'warning');
+                const card = document.getElementById(`rec-card-${recId}`);
+                if (card) {
+                    card.style.opacity = '0.3';
+                    card.querySelector('.rec-actions').style.display = 'none';
+                }
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (e) {
+            showToast('Failed to reject recommendation.', 'error');
+        }
+    }
+</script>
+{% endblock %}

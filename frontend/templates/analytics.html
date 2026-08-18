@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Operational Analytics & Insights</h1>
+        <p>Analyze fulfillment throughput, exception frequencies, stock category health, and carrier performance.</p>
+    </div>
+</div>
+
+<!-- Charts Grid -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+    <!-- Chart 1: Stock Levels -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Inventory Stock levels by Category</h2>
+        </div>
+        <div class="panel-body" style="height:280px; display:flex; align-items:center; justify-content:center;">
+            <canvas id="chart-stock-levels"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart 2: Exceptions Breakdown -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Fulfillment Exceptions Breakdown</h2>
+        </div>
+        <div class="panel-body" style="height:280px; display:flex; align-items:center; justify-content:center;">
+            <canvas id="chart-exceptions"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart 3: Order Statuses -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Active Order Status Distribution</h2>
+        </div>
+        <div class="panel-body" style="height:280px; display:flex; align-items:center; justify-content:center;">
+            <canvas id="chart-orders"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart 4: Dispatch Trend -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Daily Dispatch Volume (7-day trend)</h2>
+        </div>
+        <div class="panel-body" style="height:280px; display:flex; align-items:center; justify-content:center;">
+            <canvas id="chart-dispatch"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Recommendations & Problem Areas -->
+<div class="dashboard-layout" style="grid-template-columns: 1fr 1fr; margin-top:0.5rem;">
+    <div class="panel">
+        <div class="panel-header">
+            <h2 style="color:var(--accent-red);"><i data-lucide="shield-alert"></i> Top Operational Friction Points</h2>
+        </div>
+        <div class="panel-body" style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.85rem;">
+            <div
+                style="padding:0.75rem; background-color:rgba(239, 68, 68, 0.03); border:1px solid rgba(239, 68, 68, 0.15); border-radius:6px;">
+                <strong>1. Stockout Risk on Electronics</strong>
+                <p style="color:var(--text-secondary); font-size:0.8rem; margin-top:0.15rem;">Wireless Mouse and
+                    Mechanical Keyboards are causing 3 order backlogs.</p>
+            </div>
+            <div
+                style="padding:0.75rem; background-color:rgba(245, 158, 11, 0.03); border:1px solid rgba(245, 158, 11, 0.15); border-radius:6px;">
+                <strong>2. Zone B Picking Congestion</strong>
+                <p style="color:var(--text-secondary); font-size:0.8rem; margin-top:0.15rem;">Average pick delay in Zone
+                    B increased by 32% over past 24 hours.</p>
+            </div>
+            <div
+                style="padding:0.75rem; background-color:rgba(255, 255, 255, 0.03); border:1px solid var(--border-color); border-radius:6px;">
+                <strong>3. Minor Carrier Dispatch Lag</strong>
+                <p style="color:var(--text-secondary); font-size:0.8rem; margin-top:0.15rem;">Carrier pickup slots are
+                    missing deadlines by average of 14 minutes.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h2 style="color:var(--accent-green);"><i data-lucide="sparkles"></i> Recommended System Enhancements</h2>
+        </div>
+        <div class="panel-body" style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.85rem;">
+            <div
+                style="padding:0.75rem; background-color:rgba(16, 185, 129, 0.03); border:1px solid rgba(16, 185, 129, 0.15); border-radius:6px;">
+                <strong>1. Increase Safety Stock Levels for High-Volume SKUs</strong>
+                <p style="color:var(--text-secondary); font-size:0.8rem; margin-top:0.15rem;">Advise raising P101
+                    reorder trigger from 10 units to 25 units based on velocity analysis.</p>
+            </div>
+            <div
+                style="padding:0.75rem; background-color:rgba(168, 85, 247, 0.03); border:1px solid rgba(168, 85, 247, 0.15); border-radius:6px;">
+                <strong>2. Optimize Picker Floor Distribution</strong>
+                <p style="color:var(--text-secondary); font-size:0.8rem; margin-top:0.15rem;">Consider moving picker
+                    PK102 permanently to Zone B for peak hours support.</p>
+            </div>
+            <div
+                style="padding:0.75rem; background-color:rgba(255, 255, 255, 0.03); border:1px solid var(--border-color); border-radius:6px;">
+                <strong>3. Automated Replenishment Contracts</strong>
+                <p style="color:var(--text-secondary); font-size:0.8rem; margin-top:0.15rem;">Enable auto PO approval
+                    for items under 5 units to compress procurement lead time.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="analytics-data" type="application/json">
+{
+    "categories": {{ cat_stock_labels|tojson }},
+    "stockValues": {{ cat_stock_values|tojson }},
+    "exceptionLabels": {{ ex_breakdown_labels|tojson }},
+    "exceptionCounts": {{ ex_breakdown_values|tojson }},
+    "orderLabels": {{ ord_stats_labels|tojson }},
+    "orderCounts": {{ ord_stats_values|tojson }},
+    "days": {{ days|tojson }},
+    "dispatches": {{ dispatches|tojson }}
+}
+</script>
+<script>
+    // Parse the data injected by Jinja
+    const analyticsData = JSON.parse(document.getElementById('analytics-data').textContent);
+
+    // 1. Stock Levels Chart
+    const stockCtx = document.getElementById('chart-stock-levels').getContext('2d');
+    const categories = analyticsData.categories;
+    const stockValues = analyticsData.stockValues;
+
+    new Chart(stockCtx, {
+        type: 'bar',
+        data: {
+            labels: categories,
+            datasets: [{
+                label: 'Available Quantity',
+                data: stockValues,
+                backgroundColor: 'rgba(14, 165, 233, 0.6)',
+                borderColor: '#0ea5e9',
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 2. Exceptions Breakdown Chart
+    const exceptionsCtx = document.getElementById('chart-exceptions').getContext('2d');
+    const exceptionLabels = analyticsData.exceptionLabels;
+    const exceptionCounts = analyticsData.exceptionCounts;
+
+    new Chart(exceptionsCtx, {
+        type: 'doughnut',
+        data: {
+            labels: exceptionLabels,
+            datasets: [{
+                data: exceptionCounts,
+                backgroundColor: [
+                    '#ef4444', '#f59e0b', '#a855f7', '#0ea5e9', '#10b981', '#3b82f6', '#ec4899', '#6366f1'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right', labels: { color: '#94a3b8', boxWidth: 12 } }
+            }
+        }
+    });
+
+    // 3. Orders status Distribution Chart
+    const ordersCtx = document.getElementById('chart-orders').getContext('2d');
+    const orderLabels = analyticsData.orderLabels;
+    const orderCounts = analyticsData.orderCounts;
+
+    new Chart(ordersCtx, {
+        type: 'polarArea',
+        data: {
+            labels: orderLabels,
+            datasets: [{
+                data: orderCounts,
+                backgroundColor: [
+                    'rgba(14, 165, 233, 0.4)', 'rgba(245, 158, 11, 0.4)', 'rgba(168, 85, 247, 0.4)', 'rgba(16, 185, 129, 0.4)', 'rgba(239, 68, 68, 0.4)'
+                ],
+                borderColor: '#1e293b',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right', labels: { color: '#94a3b8', boxWidth: 12 } }
+            },
+            scales: {
+                r: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } }
+            }
+        }
+    });
+
+    // 4. Dispatch Trend Chart
+    const dispatchCtx = document.getElementById('chart-dispatch').getContext('2d');
+    const days = analyticsData.days;
+    const dispatches = analyticsData.dispatches;
+
+    new Chart(dispatchCtx, {
+        type: 'line',
+        data: {
+            labels: days,
+            datasets: [{
+                label: 'Orders Dispatched',
+                data: dispatches,
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderColor: '#10b981',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+</script>
+{% endblock %}

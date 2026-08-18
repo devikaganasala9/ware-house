@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Audit Logs | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Operational Audit Trails</h1>
+        <p>A tamper-evident logging of all operator adjustments, reallocations, and smart recommendations accepted.</p>
+    </div>
+</div>
+
+<!-- Search Input -->
+<div class="filter-bar">
+    <div class="filter-group" style="flex:1;">
+        <label for="search-logs">Search Audit Logs</label>
+        <input type="text" id="search-logs" placeholder="Type user role, action type, or target ID to filter..." class="filter-input" style="width:100%;">
+    </div>
+</div>
+
+<!-- Logs Panel -->
+<div class="panel">
+    <div class="panel-body">
+        <div class="data-table-wrapper">
+            <table class="data-table" id="audit-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User Role</th>
+                        <th>Action Category</th>
+                        <th>Operational Details</th>
+                        <th>Declared Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr class="log-row">
+                        <td><span style="font-family:monospace; font-size:0.8rem;">{{ log.timestamp.replace('T', ' ')[:19] }}</span></td>
+                        <td><strong>{{ log.user_role }}</strong></td>
+                        <td><span class="badge badge-priority-low" style="text-transform:uppercase;">{{ log.action }}</span></td>
+                        <td>{{ log.details }}</td>
+                        <td><span style="font-style:italic; color:var(--text-secondary);">{{ log.reason }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align:center; color:var(--text-muted); padding:2rem 0;">No audit records found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Front-end Filtering for quick hackathon responsiveness
+    document.getElementById('search-logs').addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        const rows = document.querySelectorAll('.log-row');
+        
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            if (text.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+</script>
+{% endblock %}

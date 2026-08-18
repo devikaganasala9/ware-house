@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block title %}Exceptions | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Exceptions & Incidents</h1>
+        <p>Monitor order issues, inventory shortages, and damaged goods. Resolve using the Decision Engine workflow.</p>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<form action="{{ url_for('exceptions') }}" method="GET" class="filter-bar">
+    <div class="filter-group">
+        <label for="search-q">Search Exceptions</label>
+        <input type="text" name="q" id="search-q" value="{{ q }}" placeholder="Exception ID, description, ref..." class="filter-input">
+    </div>
+    
+    <div class="filter-group">
+        <label for="status-select">Status</label>
+        <select name="status" id="status-select" class="filter-input">
+            <option value="">All Statuses</option>
+            <option value="Open" {% if selected_status == 'Open' %}selected{% endif %}>Open</option>
+            <option value="Investigating" {% if selected_status == 'Investigating' %}selected{% endif %}>Investigating</option>
+            <option value="Action Required" {% if selected_status == 'Action Required' %}selected{% endif %}>Action Required</option>
+            <option value="Resolved" {% if selected_status == 'Resolved' %}selected{% endif %}>Resolved</option>
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <label for="severity-select">Severity</label>
+        <select name="severity" id="severity-select" class="filter-input">
+            <option value="">All Severities</option>
+            <option value="Critical" {% if selected_severity == 'Critical' %}selected{% endif %}>Critical</option>
+            <option value="High" {% if selected_severity == 'High' %}selected{% endif %}>High</option>
+            <option value="Medium" {% if selected_severity == 'Medium' %}selected{% endif %}>Medium</option>
+            <option value="Low" {% if selected_severity == 'Low' %}selected{% endif %}>Low</option>
+        </select>
+    </div>
+    
+    <div class="filter-group" style="align-self: flex-end;">
+        <button type="submit" class="btn btn-primary"><i data-lucide="search"></i> Filter</button>
+    </div>
+    
+    <div class="filter-group" style="align-self: flex-end;">
+        <a href="{{ url_for('exceptions') }}" class="btn btn-secondary"><i data-lucide="x"></i> Clear</a>
+    </div>
+</form>
+
+<!-- Exceptions Panel -->
+<div class="panel">
+    <div class="panel-body" style="display:flex; flex-direction:column; gap:1.5rem;">
+        {% if exceptions %}
+            {% for ex in exceptions %}
+            <div style="background-color:rgba(0,0,0,0.1); border:1px solid var(--border-color); border-radius:10px; padding:1.5rem; position:relative;">
+                <!-- Top Heading -->
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                    <div style="display:flex; align-items:center; gap:0.75rem;">
+                        <span style="font-weight:700; font-size:1.1rem; color:{% if ex.severity == 'Critical' %}var(--accent-red){% else %}var(--text-primary){% endif %};">
+                            {{ ex.id }}
+                        </span>
+                        <span class="badge badge-priority-{{ ex.severity|lower }}">{{ ex.severity }} Severity</span>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <span style="font-size:0.75rem; color:var(--text-secondary);">Detected: {{ ex.detected_time.replace('T', ' ')[:16] }}</span>
+                        <span class="badge badge-status-{{ ex.status|lower|replace(' ', '-') }}">{{ ex.status }}</span>
+                    </div>
+                </div>
+                
+                <!-- Body Description -->
+                <div style="margin:0.85rem 0;">
+                    <h4 style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">{{ ex.type }}</h4>
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.25rem;">{{ ex.description }}</p>
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.25rem;">Reference Item ID: <strong>{{ ex.ref_id }}</strong></p>
+                </div>
+                
+                <!-- Exception -> Decision -> Resolution Workflow Stepper -->
+                <div style="margin-top:1.25rem; padding-top:1.25rem; border-top:1px solid var(--border-color);">
+                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:0.75rem; letter-spacing:0.5px;">
+                        Exception Resolution Lifecycle Timeline
+                    </span>
+                    
+                    <div style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.85rem;">
+                        <div style="display:flex; gap:0.75rem; align-items:flex-start;">
+                            <span style="color:var(--accent-red); font-weight:700; width:100px; display:inline-block;">[EXCEPTION]</span>
+                            <span style="flex:1;">Incident flagged automatically by operations. Available Stock discrepancy or QC check discrepancy.</span>
+                        </div>
+                        <div style="display:flex; gap:0.75rem; align-items:flex-start; margin-top:0.15rem;">
+                            <span style="color:var(--accent-blue); font-weight:700; width:100px; display:inline-block;">[DECISION]</span>
+                            <span style="flex:1; color:var(--accent-blue); font-weight:600;">Recommendation: {{ ex.recommendation }}</span>
+                        </div>
+                        <div style="display:flex; gap:0.75rem; align-items:flex-start; margin-top:0.15rem;">
+                            <span style="color:var(--accent-green); font-weight:700; width:100px; display:inline-block;">[RESOLUTION]</span>
+                            <span style="flex:1;">
+                                {% if ex.status == 'Resolved' %}
+                                <strong style="color:var(--accent-green);">RESOLVED:</strong> {{ ex.resolution_notes }}
+                                {% else %}
+                                <span style="color:var(--text-muted); font-style:italic;">Awaiting action. You can accept the generated Recommendation, or resolve this incident manually below.</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Actions buttons -->
+                {% if ex.status != 'Resolved' %}
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.25rem;">
+                    <!-- Accept the recommendation link (if it exists) -->
+                    {% if ex.type == 'Quality Check Failure' %}
+                    <a href="{{ url_for('recommendations') }}" class="btn btn-primary" style="padding:0.4rem 0.8rem; font-size:0.8rem;">
+                        <i data-lucide="cpu"></i> Go to Recommendation
+                    </a>
+                    {% endif %}
+                    <button onclick="triggerResolveModal('{{ ex.id }}')" class="btn btn-secondary" style="padding:0.4rem 0.8rem; font-size:0.8rem;">
+                        <i data-lucide="check-square"></i> Resolve Manually
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="text-align:center; color:var(--text-muted); padding:3rem 0;">No active exceptions found. Warehouse is running optimally.</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal: Resolve Exception Manually Overlay -->
+<div class="modal-overlay" id="resolve-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>Resolve Exception Manually</span>
+            <button onclick="closeModal('resolve-modal')" class="modal-close">&times;</button>
+        </div>
+        <form id="resolve-exception-form">
+            <div class="modal-body">
+                <input type="hidden" name="exception_id" id="resolve-ex-id">
+                <div class="form-group">
+                    <label>Exception ID</label>
+                    <input type="text" id="resolve-ex-display" readonly class="form-input" style="opacity:0.7;">
+                </div>
+                <div class="form-group">
+                    <label for="resolve-notes">Incident Resolution Action Taken</label>
+                    <input type="text" name="notes" id="resolve-notes" required class="form-input" placeholder="e.g. Conducted physical audit; stock levels corrected.">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('resolve-modal')" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Resolve Exception</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    /* global openModal, closeModal, postData, showToast */
+    function triggerResolveModal(exId) {
+        document.getElementById('resolve-ex-id').value = exId;
+        document.getElementById('resolve-ex-display').value = exId;
+        document.getElementById('resolve-notes').value = '';
+        openModal('resolve-modal');
+    }
+
+    document.getElementById('resolve-exception-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const data = {
+            exception_id: fd.get('exception_id'),
+            notes: fd.get('notes')
+        };
+        try {
+            const res = await postData('/api/exceptions/resolve', data);
+            if (res.success) {
+                showToast(res.message, 'success');
+                closeModal('resolve-modal');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (err) {
+            showToast('Failed to resolve exception.', 'error');
+        }
+    });
+</script>
+{% endblock %}

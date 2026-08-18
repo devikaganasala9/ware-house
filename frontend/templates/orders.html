@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+
+{% block title %}Orders | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div class="page-title">
+        <h1>Orders Management</h1>
+        <p>Monitor order lifecycle statuses, calculate delay risk, and adjust fulfillment priorities.</p>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<form action="{{ url_for('orders') }}" method="GET" class="filter-bar">
+
+    <div class="filter-group">
+        <label for="search-q">Search Orders</label>
+        <input
+            type="text"
+            name="q"
+            id="search-q"
+            value="{{ q }}"
+            placeholder="Order ID or Customer..."
+            class="filter-input"
+        >
+    </div>
+
+    <div class="filter-group">
+        <label for="status-select">Status</label>
+        <select name="status" id="status-select" class="filter-input">
+            <option value="">All Statuses</option>
+
+            <option value="Created"
+                {% if selected_status == 'Created' %}selected{% endif %}>
+                Created
+            </option>
+
+            <option value="Pending Allocation"
+                {% if selected_status == 'Pending Allocation' %}selected{% endif %}>
+                Pending Allocation
+            </option>
+
+            <option value="Partially Allocated"
+                {% if selected_status == 'Partially Allocated' %}selected{% endif %}>
+                Partially Allocated
+            </option>
+
+            <option value="Allocated"
+                {% if selected_status == 'Allocated' %}selected{% endif %}>
+                Allocated
+            </option>
+
+            <option value="Picking"
+                {% if selected_status == 'Picking' %}selected{% endif %}>
+                Picking
+            </option>
+
+            <option value="Packed"
+                {% if selected_status == 'Packed' %}selected{% endif %}>
+                Packed
+            </option>
+
+            <option value="Quality Check"
+                {% if selected_status == 'Quality Check' %}selected{% endif %}>
+                Quality Check
+            </option>
+
+            <option value="Ready for Dispatch"
+                {% if selected_status == 'Ready for Dispatch' %}selected{% endif %}>
+                Ready for Dispatch
+            </option>
+
+            <option value="Dispatched"
+                {% if selected_status == 'Dispatched' %}selected{% endif %}>
+                Dispatched
+            </option>
+
+            <option value="Delayed"
+                {% if selected_status == 'Delayed' %}selected{% endif %}>
+                Delayed
+            </option>
+
+            <option value="Cancelled"
+                {% if selected_status == 'Cancelled' %}selected{% endif %}>
+                Cancelled
+            </option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="priority-select">Priority</label>
+
+        <select name="priority" id="priority-select" class="filter-input">
+            <option value="">All Priorities</option>
+
+            <option value="Critical"
+                {% if selected_priority == 'Critical' %}selected{% endif %}>
+                Critical
+            </option>
+
+            <option value="High"
+                {% if selected_priority == 'High' %}selected{% endif %}>
+                High
+            </option>
+
+            <option value="Medium"
+                {% if selected_priority == 'Medium' %}selected{% endif %}>
+                Medium
+            </option>
+
+            <option value="Low"
+                {% if selected_priority == 'Low' %}selected{% endif %}>
+                Low
+            </option>
+        </select>
+    </div>
+
+    <div class="filter-group" style="align-self: flex-end;">
+        <button type="submit" class="btn btn-primary">
+            <i data-lucide="search"></i>
+            Search
+        </button>
+    </div>
+
+    <div class="filter-group" style="align-self: flex-end;">
+        <a href="{{ url_for('orders') }}" class="btn btn-secondary">
+            <i data-lucide="x"></i>
+            Clear
+        </a>
+    </div>
+
+</form>
+
+
+<!-- Orders Table Panel -->
+<div class="panel">
+
+    <div class="panel-body">
+
+        <div class="data-table-wrapper">
+
+            <table class="data-table">
+
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Order Date</th>
+                        <th>Deadline</th>
+                        <th>Priority Score</th>
+                        <th>Priority Level</th>
+                        <th>Fulfillment Status</th>
+                        <th>Delay Risk</th>
+                        <th>Payment</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% if orders %}
+                        {% for order in orders %}
+
+                        <tr>
+
+                            <!-- Order ID -->
+                            <td>
+                                <strong>
+                                    O{{ order.id[1:] if order.id.startswith('O') else order.id }}
+                                </strong>
+                            </td>
+
+
+                            <!-- Customer -->
+                            <td>
+                                {{ order.customer }}
+                            </td>
+
+
+                            <!-- Order Date -->
+                            <td>
+                                <span class="order-date-text">
+                                    {{ order.order_date.replace('T', ' ')[:10] }}
+                                </span>
+                            </td>
+
+
+                            <!-- Deadline -->
+                            <td>
+                                <span class="order-deadline-text">
+                                    {{ order.deadline.replace('T', ' ')[:16] }}
+                                </span>
+                            </td>
+
+
+                            <!-- Priority Score -->
+                            <td>
+
+                                <div class="priority-score-bar-wrapper">
+
+                                    <div class="priority-score-track">
+
+                                        {% if order.priority_score >= 70 %}
+
+                                            <div
+                                                class="priority-score-fill priority-critical"
+                                                style="width: {{ order.priority_score }}%;"
+                                            ></div>
+
+                                        {% elif order.priority_score >= 50 %}
+
+                                            <div
+                                                class="priority-score-fill priority-high"
+                                                style="width: {{ order.priority_score }}%;"
+                                            ></div>
+
+                                        {% elif order.priority_score >= 30 %}
+
+                                            <div
+                                                class="priority-score-fill priority-medium"
+                                                style="width: {{ order.priority_score }}%;"
+                                            ></div>
+
+                                        {% else %}
+
+                                            <div
+                                                class="priority-score-fill priority-low"
+                                                style="width: {{ order.priority_score }}%;"
+                                            ></div>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                    <span class="priority-score-value">
+                                        {{ order.priority_score }}
+                                    </span>
+
+                                </div>
+
+                            </td>
+
+
+                            <!-- Priority Level -->
+                            <td>
+                                <span class="badge badge-priority-{{ order.priority_level|lower }}">
+                                    {{ order.priority_level }}
+                                </span>
+                            </td>
+
+
+                            <!-- Status badge -->
+                            <td>
+                                <span class="badge badge-status-{{ order.status|lower|replace(' ', '-') }}">
+                                    {{ order.status }}
+                                </span>
+                            </td>
+
+
+                            <!-- Delay Risk -->
+                            <td>
+                                <strong class="risk-level-text {% if order.risk_level in ['Critical','High'] %}risk-urgent{% else %}risk-safe{% endif %}">
+                                    {{ order.risk_level }}
+                                </strong>
+                            </td>
+
+
+                            <!-- Payment Status -->
+                            <td>
+
+                                {% if order.payment_status == 'Paid' %}
+                                <span style="color:var(--accent-green); font-size:0.8rem; font-weight:600;">
+                                    <i data-lucide="check" style="width:12px; height:12px; display:inline-block; vertical-align:middle;"></i> Paid
+                                </span>
+                                {% else %}
+                                <span style="color:var(--text-muted); font-size:0.8rem;">
+                                    Pending
+                                </span>
+                                {% endif %}
+
+                            </td>
+
+
+                            <!-- Actions -->
+                            <td>
+
+                                <a
+                                    href="/orders/{{ order.id }}"
+                                    class="btn btn-secondary order-details-btn"
+                                >
+                                    <i data-lucide="eye"></i>
+                                    Details
+                                </a>
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+                    {% else %}
+
+                        <tr>
+
+                            <td
+                                colspan="10"
+                                class="no-orders"
+                            >
+                                No orders found.
+                            </td>
+
+                        </tr>
+
+                    {% endif %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+<script>
+    document.querySelectorAll('.priority-score-fill').forEach(function (bar) {
+        bar.style.width = bar.dataset.width + '%';
+    });
+</script>
+{% endblock %}

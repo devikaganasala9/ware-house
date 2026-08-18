@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+
+{% block title %}What-If Simulator | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>What-If Warehouse Simulator</h1>
+        <p>Model supply chain disruptions, resource decreases, and volume spikes before executing floor adjustments.</p>
+    </div>
+</div>
+
+<div class="simulator-grid">
+    <!-- Sliders and selectors column -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Simulation Parameters</h2>
+        </div>
+        <form id="simulator-form" class="panel-body simulator-controls">
+            <!-- Parameter 1: Influx of urgent orders -->
+            <div class="sim-slider-group">
+                <div class="sim-slider-label">
+                    <span>New Urgent Orders Influx</span>
+                    <span id="label-new-orders" style="color:var(--accent-purple); font-weight:700;">0 orders</span>
+                </div>
+                <input type="range" name="new_orders" id="slide-new-orders" min="0" max="30" value="0" class="sim-slider">
+            </div>
+
+            <!-- Parameter 2: Product Stockout simulation -->
+            <div class="form-group" style="margin-top:0.25rem;">
+                <label for="stockout-product">Simulate Product Stockout</label>
+                <select name="stockout_product" id="stockout-product" class="filter-input" style="width:100%;">
+                    <option value="">No stockout (System default)</option>
+                    {% for p in products %}
+                    <option value="{{ p.id }}">{{ p.name }} ({{ p.id }}) - Avail: {{ p.available_qty }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Parameter 3: Picker speed/capacity reduction -->
+            <div class="sim-slider-group">
+                <div class="sim-slider-label">
+                    <span>Picking Staff Capacity Loss</span>
+                    <span id="label-pickers-loss" style="color:var(--accent-purple); font-weight:700;">0% loss</span>
+                </div>
+                <input type="range" name="picker_reduction" id="slide-pickers-loss" min="0" max="80" step="10" value="0" class="sim-slider">
+            </div>
+
+            <!-- Parameter 4: Several products become damaged -->
+            <div class="sim-slider-group">
+                <div class="sim-slider-label">
+                    <span>Damaged Stock Incident</span>
+                    <span id="label-damaged" style="color:var(--accent-purple); font-weight:700;">0 items</span>
+                </div>
+                <input type="range" name="damaged_qty" id="slide-damaged" min="0" max="40" step="5" value="0" class="sim-slider">
+            </div>
+
+            <!-- Parameter 5: Supplier delivery delay -->
+            <div class="sim-slider-group">
+                <div class="sim-slider-label">
+                    <span>Supplier Carrier Delay</span>
+                    <span id="label-delay" style="color:var(--accent-purple); font-weight:700;">0 hours</span>
+                </div>
+                <input type="range" name="supplier_delay" id="slide-delay" min="0" max="72" step="6" value="0" class="sim-slider">
+            </div>
+
+            <button type="submit" class="btn btn-accent" style="width:100%; justify-content:center; padding:0.75rem; margin-top:0.75rem;">
+                <i data-lucide="play-circle"></i> RUN SIMULATION
+            </button>
+        </form>
+    </div>
+
+    <!-- Comparison Dashboard results column -->
+    <div style="display:flex; flex-direction:column; gap:1.5rem;">
+        <div class="panel" style="flex:1;">
+            <div class="panel-header">
+                <h2>Comparison Dashboard (Current vs Simulated)</h2>
+            </div>
+            <div class="panel-body">
+                <div class="sim-results-grid">
+                    <!-- Metric 1: Orders Affected -->
+                    <div class="sim-comparison-card">
+                        <span class="sim-comparison-title">Orders Affected</span>
+                        <div style="display:flex; align-items:baseline; gap:0.5rem;">
+                            <span class="sim-comparison-val" id="metric-orders-baseline">0</span>
+                            <span style="font-size:0.85rem; color:var(--text-secondary);">vs</span>
+                            <span class="sim-comparison-val" id="metric-orders-simulated" style="color:var(--text-primary);">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Metric 2: Delay Hours -->
+                    <div class="sim-comparison-card">
+                        <span class="sim-comparison-title">Avg Fulfillment Delay</span>
+                        <div style="display:flex; align-items:baseline; gap:0.5rem;">
+                            <span class="sim-comparison-val" id="metric-delay-baseline">0 hrs</span>
+                            <span style="font-size:0.85rem; color:var(--text-secondary);">vs</span>
+                            <span class="sim-comparison-val" id="metric-delay-simulated" style="color:var(--text-primary);">0 hrs</span>
+                        </div>
+                    </div>
+
+                    <!-- Metric 3: Revenue at Risk -->
+                    <div class="sim-comparison-card">
+                        <span class="sim-comparison-title">Revenue At Risk</span>
+                        <div style="display:flex; align-items:baseline; gap:0.5rem;">
+                            <span class="sim-comparison-val" id="metric-revenue-baseline">$0.00</span>
+                            <span style="font-size:0.85rem; color:var(--text-secondary);">vs</span>
+                            <span class="sim-comparison-val" id="metric-revenue-simulated" style="color:var(--text-primary);">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Metric 4: Congestion Score -->
+                    <div class="sim-comparison-card">
+                        <span class="sim-comparison-title">Zone Congestion Index</span>
+                        <div style="display:flex; align-items:baseline; gap:0.5rem;">
+                            <span class="sim-comparison-val" id="metric-congestion-baseline">12%</span>
+                            <span style="font-size:0.85rem; color:var(--text-secondary);">vs</span>
+                            <span class="sim-comparison-val" id="metric-congestion-simulated" style="color:var(--text-primary);">12%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Recommendations Box -->
+                <div style="background-color:rgba(168, 85, 247, 0.05); border:1.5px dashed rgba(168, 85, 247, 0.3); border-radius:10px; padding:1.25rem;">
+                    <div style="display:flex; gap:0.5rem; align-items:center; color:var(--accent-purple); font-weight:700; font-size:0.95rem;">
+                        <i data-lucide="cpu"></i>
+                        <span>🤖 SIMULATOR AI MITIGATION recommendation</span>
+                    </div>
+                    <p id="sim-ai-recommendation" style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.5rem; line-height:1.4;">
+                        Select parameters on the left pane and run the simulator to construct proactive mitigation strategies.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Link sliders to labels
+    const sliders = [
+        { id: 'slide-new-orders', label: 'label-new-orders', suffix: ' orders' },
+        { id: 'slide-pickers-loss', label: 'label-pickers-loss', suffix: '% loss' },
+        { id: 'slide-damaged', label: 'label-damaged', suffix: ' items' },
+        { id: 'slide-delay', label: 'label-delay', suffix: ' hours' }
+    ];
+
+    sliders.forEach(s => {
+        const slider = document.getElementById(s.id);
+        const label = document.getElementById(s.label);
+        slider.addEventListener('input', (e) => {
+            label.innerText = e.target.value + s.suffix;
+        });
+    });
+
+    // Form Submission
+    document.getElementById('simulator-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        
+        try {
+            const res = await postData('/api/simulator/run', {
+                new_orders: fd.get('new_orders'),
+                stockout_product: fd.get('stockout_product'),
+                picker_reduction: fd.get('picker_reduction'),
+                damaged_qty: fd.get('damaged_qty'),
+                supplier_delay: fd.get('supplier_delay')
+            });
+
+            // Update DOM Comparison Cards
+            document.getElementById('metric-orders-baseline').innerText = "0";
+            document.getElementById('metric-orders-simulated').innerText = res.affected_orders;
+            if (res.affected_orders > 0) {
+                document.getElementById('metric-orders-simulated').style.color = "var(--accent-red)";
+            } else {
+                document.getElementById('metric-orders-simulated').style.color = "var(--text-primary)";
+            }
+
+            document.getElementById('metric-delay-baseline').innerText = "1.2 hrs";
+            document.getElementById('metric-delay-simulated').innerText = res.expected_delay_hours + " hrs";
+            if (res.expected_delay_hours > 1.2) {
+                document.getElementById('metric-delay-simulated').style.color = "var(--accent-orange)";
+            } else {
+                document.getElementById('metric-delay-simulated').style.color = "var(--text-primary)";
+            }
+
+            document.getElementById('metric-revenue-baseline').innerText = "$0.00";
+            document.getElementById('metric-revenue-simulated').innerText = "$" + res.revenue_at_risk.toFixed(2);
+            if (res.revenue_at_risk > 0) {
+                document.getElementById('metric-revenue-simulated').style.color = "var(--accent-red)";
+            } else {
+                document.getElementById('metric-revenue-simulated').style.color = "var(--text-primary)";
+            }
+
+            document.getElementById('metric-congestion-baseline').innerText = "12%";
+            document.getElementById('metric-congestion-simulated').innerText = res.bottleneck_score + "%";
+            if (res.bottleneck_score > 30) {
+                document.getElementById('metric-congestion-simulated').style.color = "var(--accent-red)";
+            } else {
+                document.getElementById('metric-congestion-simulated').style.color = "var(--text-primary)";
+            }
+
+            // Update AI mitigtions
+            document.getElementById('sim-ai-recommendation').innerText = res.ai_recommendation;
+
+            showToast("Simulation computed successfully.", "success");
+        } catch (err) {
+            showToast("Failed to compute simulation metrics.", "error");
+        }
+    });
+</script>
+{% endblock %}

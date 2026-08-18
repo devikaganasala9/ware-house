@@ -1,0 +1,396 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | Smart Warehouse AI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Operations Command Center</h1>
+        <p>Real-time analytics, automated decisions, and exception fulfillment resolution.</p>
+    </div>
+    <div class="page-actions">
+        <form action="/api/reset-db" method="POST" id="reset-db-form" style="display:inline;">
+            <button type="submit" class="btn btn-secondary">
+                <i data-lucide="refresh-cw"></i> Reset Database
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- 1. KPI Cards Grid -->
+<div class="kpi-grid">
+    <div class="kpi-card blue">
+        <div class="kpi-info">
+            <h3>Total Products</h3>
+            <div class="kpi-value">{{ kpis.total_products }}</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="database"></i></div>
+    </div>
+    
+    <div class="kpi-card blue">
+        <div class="kpi-info">
+            <h3>Inventory Units</h3>
+            <div class="kpi-value">{{ kpis.total_inventory }}</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="layers"></i></div>
+    </div>
+    
+    <div class="kpi-card orange">
+        <div class="kpi-info">
+            <h3>Pending Orders</h3>
+            <div class="kpi-value">{{ kpis.pending_orders }}</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="clock"></i></div>
+    </div>
+    
+    <div class="kpi-card orange">
+        <div class="kpi-info">
+            <h3>Orders Picking</h3>
+            <div class="kpi-value">{{ kpis.orders_picking }}</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="navigation"></i></div>
+    </div>
+
+    <div class="kpi-card green">
+        <div class="kpi-info">
+            <h3>Ready to Ship</h3>
+            <div class="kpi-value">{{ kpis.orders_ready }}</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="check-square"></i></div>
+    </div>
+
+    <div class="kpi-card orange">
+        <div class="kpi-info">
+            <h3>Low Stock</h3>
+            <div class="kpi-value" style="color: var(--accent-orange);">{{ kpis.low_stock }}</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="trending-down"></i></div>
+    </div>
+
+    <div class="kpi-card red">
+        <div class="kpi-info">
+            <h3>Out of Stock</h3>
+            <div class="kpi-value" style="color: var(--accent-red);">{{ kpis.out_of_stock }}</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="shield-alert"></i></div>
+    </div>
+
+    <div class="kpi-card red">
+        <div class="kpi-info">
+            <h3>Delayed Orders</h3>
+            <div class="kpi-value" style="color: var(--accent-red);">{{ kpis.delayed_orders }}</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="hourglass"></i></div>
+    </div>
+
+    <div class="kpi-card red">
+        <div class="kpi-info">
+            <h3>Damaged Products</h3>
+            <div class="kpi-value" style="color: var(--accent-red);">{{ kpis.damaged_items }}</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="heart-off"></i></div>
+    </div>
+
+    <div class="kpi-card purple">
+        <div class="kpi-info">
+            <h3>Fulfillment Rate</h3>
+            <div class="kpi-value">{{ kpis.fulfillment_rate }}%</div>
+        </div>
+        <div class="kpi-icon"><i data-lucide="percent"></i></div>
+    </div>
+</div>
+
+<!-- 2. Interactive Hackathon Live Scenario Runner -->
+<div class="demo-stepper-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <h3 style="font-size: 1.1rem; font-weight:700; color: white;">🔥 HACKATHON LIVE DEMO MODE</h3>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.25rem;">
+                Run a live fulfillment exception scenario and watch the Decision Engine calculate priority, identify bottlenecks, and reallocate stock.
+            </p>
+        </div>
+        <button id="run-demo-btn" class="btn btn-accent">
+            <i data-lucide="play-circle"></i> RUN LIVE SCENARIO
+        </button>
+    </div>
+    
+    <div id="demo-stepper-wrapper" style="display:none; margin-top:1.5rem; border-top:1.5px dashed rgba(14, 165, 233, 0.2); padding-top:1.25rem;">
+        <div class="demo-stepper-list" id="demo-stepper-list">
+            <!-- Stepper elements added dynamically -->
+        </div>
+    </div>
+</div>
+
+<!-- 3. Dashboard Details Layout -->
+<div class="dashboard-layout">
+    <!-- Left Hand Columns: Priority Orders & Exceptions -->
+    <div style="display:flex; flex-direction:column; gap:1.5rem;">
+        <!-- Priority Orders Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2><i data-lucide="star" style="color: var(--accent-orange);"></i> High-Priority Active Orders</h2>
+                <a href="{{ url_for('orders') }}" style="font-size:0.8rem; color:var(--accent-blue); text-decoration:none; font-weight:600;">View All</a>
+            </div>
+            <div class="panel-body">
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th>Deadline</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if priority_orders %}
+                                {% for order in priority_orders %}
+                                <tr>
+                                    <td><strong><a href="/orders/{{ order.id }}" style="color:var(--text-primary); text-decoration:none;">{{ order.id }}</a></strong></td>
+                                    <td>{{ order.customer }}</td>
+                                    <td><span style="font-family:monospace;">{{ order.deadline.replace('T', ' ')[:16] }}</span></td>
+                                    <td><span class="badge badge-priority-{{ order.priority_level|lower }}">{{ order.priority_level }}</span></td>
+                                    <td><span class="badge badge-status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span></td>
+                                    <td>
+                                        <a href="/orders/{{ order.id }}" class="btn btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.75rem;">
+                                            Fulfill
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" style="text-align:center; color:var(--text-muted);">No active priority orders.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Active Exceptions Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2><i data-lucide="alert-circle" style="color: var(--accent-red);"></i> Active Fulfillment Exceptions</h2>
+                <a href="{{ url_for('exceptions') }}" style="font-size:0.8rem; color:var(--accent-blue); text-decoration:none; font-weight:600;">View All</a>
+            </div>
+            <div class="panel-body">
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Exception ID</th>
+                                <th>Type</th>
+                                <th>Ref ID</th>
+                                <th>Severity</th>
+                                <th>Detected</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if active_exceptions %}
+                                {% for ex in active_exceptions %}
+                                <tr>
+                                    <td><strong>{{ ex.id }}</strong></td>
+                                    <td>{{ ex.type }}</td>
+                                    <td><span style="font-family:monospace;">{{ ex.ref_id }}</span></td>
+                                    <td><span class="badge badge-priority-{{ ex.severity|lower }}">{{ ex.severity }}</span></td>
+                                    <td><span style="font-size:0.75rem; color:var(--text-secondary);">{{ ex.detected_time.replace('T', ' ')[:16] }}</span></td>
+                                    <td><span class="badge badge-status-pending-allocation">{{ ex.status }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" style="text-align:center; color:var(--text-muted);">No active exceptions. All operations smooth.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Hand Column: Bottlenecks & Smart Recommendations -->
+    <div style="display:flex; flex-direction:column; gap:1.5rem;">
+        <!-- Bottlenecks Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2><i data-lucide="shield-alert" style="color: var(--accent-red);"></i> Warehouse Bottlenecks</h2>
+            </div>
+            <div class="panel-body">
+                <div class="bottleneck-list">
+                    {% if bottlenecks %}
+                        {% for b in bottlenecks %}
+                        <div class="bottleneck-card {{ b.severity|lower }}">
+                            <div class="bottleneck-header {{ b.severity|lower }}">
+                                <span class="title">{{ b.category }}: {{ b.target }}</span>
+                                <span class="severity">{{ b.severity }}</span>
+                            </div>
+                            <div class="bottleneck-body">
+                                {{ b.description }}
+                            </div>
+                            <div class="bottleneck-rec">
+                                <span style="display:block; font-size:0.7rem; text-transform:uppercase; opacity:0.8;">Recommendation:</span>
+                                {{ b.recommendation }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:1rem 0;">
+                            No operational bottlenecks detected. Workload is balanced.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Smart Recommendations Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2><i data-lucide="cpu" style="color: var(--accent-blue);"></i> Decision recommendations</h2>
+                <a href="{{ url_for('recommendations') }}" style="font-size:0.8rem; color:var(--accent-blue); text-decoration:none; font-weight:600;">Inbox</a>
+            </div>
+            <div class="panel-body">
+                <div class="rec-list">
+                    {% if pending_recs %}
+                        {% for rec in pending_recs %}
+                        <div class="rec-card {{ rec.priority }}" style="padding:1rem;">
+                            <div class="rec-header-row">
+                                <span class="rec-title">{{ rec.title }}</span>
+                                <span class="badge badge-priority-{{ rec.priority|lower }}" style="font-size:0.65rem;">{{ rec.priority }}</span>
+                            </div>
+                            <p style="font-size:0.8rem; color:var(--text-secondary); margin:0.35rem 0;">{{ rec.description }}</p>
+                            <div class="rec-actions">
+                                <button onclick="acceptRecommendation('{{ rec.id }}')" class="btn btn-primary" style="padding:0.25rem 0.5rem; font-size:0.75rem;">
+                                    Accept
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:1rem 0;">
+                            No recommendations pending. Engine is scanning.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Accept Recommendation helper
+    async function acceptRecommendation(recId) {
+        try {
+            const res = await postData('/api/recommendations/accept', { recommendation_id: recId });
+            if (res.success) {
+                showToast(res.message, 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (e) {
+            showToast('Failed to execute recommendation.', 'error');
+        }
+    }
+
+    // Reset database handler
+    document.getElementById('reset-db-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            const res = await postData('/api/reset-db', {});
+            if (res.success) {
+                showToast(res.message, 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(res.message, 'error');
+            }
+        } catch (err) {
+            showToast('Failed to reset database.', 'error');
+        }
+    });
+
+    // Live Scenario Stepper Animator
+    const runDemoBtn = document.getElementById('run-demo-btn');
+    const stepperWrapper = document.getElementById('demo-stepper-wrapper');
+    const stepperList = document.getElementById('demo-stepper-list');
+
+    runDemoBtn.addEventListener('click', async () => {
+        runDemoBtn.disabled = true;
+        stepperList.innerHTML = '';
+        stepperWrapper.style.display = 'block';
+
+        // Add dummy steps to show progressive AI analysis before triggering API
+        const initialSteps = [
+            "Initializing Live Warehouse Audit Engine...",
+            "Checking stock balances for high priority order backlogs...",
+            "Analyzing VIP order deadlines and active carrier slots...",
+        ];
+
+        for (let i = 0; i < initialSteps.length; i++) {
+            appendStepRow(i + 1, initialSteps[i], "Analyzing...", "active");
+            await delay(800);
+            markStepCompleted(i + 1, "Completed analysis");
+        }
+
+        // Call the API which executes the reallocation inside SQLite
+        try {
+            const res = await postData('/api/demo/run', {});
+            if (res.success && res.steps) {
+                let startIdx = initialSteps.length + 1;
+                for (let k = 0; k < res.steps.length; k++) {
+                    const step = res.steps[k];
+                    appendStepRow(startIdx + k, step.title, step.details, "active");
+                    await delay(1200);
+                    markStepCompleted(startIdx + k, step.details);
+                }
+                
+                showToast("Fulfillment live scenario completed successfully!", "success");
+                await delay(1000);
+                window.location.reload();
+            } else {
+                showToast("Scenario failed: " + res.message, "error");
+                runDemoBtn.disabled = false;
+            }
+        } catch (e) {
+            showToast("Failed to run scenario.", "error");
+            runDemoBtn.disabled = false;
+        }
+    });
+
+    function appendStepRow(num, title, details, statusClass) {
+        const row = document.createElement('div');
+        row.className = `demo-step-row ${statusClass}`;
+        row.id = `demo-step-${num}`;
+        row.innerHTML = `
+            <div class="demo-step-indicator">${num}</div>
+            <div class="demo-step-info">
+                <h4>${title}</h4>
+                <p>${details}</p>
+            </div>
+        `;
+        stepperList.appendChild(row);
+        // Scroll stepper panel to bottom
+        stepperWrapper.scrollTop = stepperWrapper.scrollHeight;
+    }
+
+    function markStepCompleted(num, details) {
+        const row = document.getElementById(`demo-step-${num}`);
+        if (row) {
+            row.className = "demo-step-row completed";
+            const p = row.querySelector('p');
+            if (p) p.innerText = details;
+        }
+    }
+
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+</script>
+{% endblock %}
