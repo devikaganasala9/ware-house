@@ -14,6 +14,14 @@ from backend.services import get_kpis, run_what_if_simulation, get_optimized_pic
 app = Flask(__name__, template_folder='frontend/templates', static_folder='static')
 app.secret_key = 'smart_warehouse_ai_secret_key'
 
+# Initialize database if it does not exist (useful for ephemeral environments like Render)
+if not os.path.exists(DB_PATH):
+    try:
+        init_db()
+        seed_db()
+    except Exception as e:
+        app.logger.error(f"Failed to auto-initialize database: {e}")
+
 # --- Middleware/Context Processors ---
 @app.context_processor
 def inject_globals():
@@ -674,8 +682,4 @@ def reset_database():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    # Initialize DB if database doesn't exist
-    if not os.path.exists(DB_PATH):
-        init_db()
-        seed_db()
     app.run(debug=True, port=5000)
